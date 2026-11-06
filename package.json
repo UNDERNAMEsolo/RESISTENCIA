@@ -1,8 +1,9 @@
+
 {
-  name cidade-dorme,
-  version 1.0.0,
-  private true,
-  scripts {
-    start node server.js
+  "name": "cidade-dorme",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node server.js"
   }
 }
