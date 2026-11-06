@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cidade Dorme</title>
+<style>
+:root{--bg:#0b1020;--card:#151c33;--ink:#e8ecff;--mute:#8b94b8;--acc:#f5c451;--bad:#ff5d6c;--line:#26304f}
+body[data-p=day],body[data-p=dayresult]{--bg:#2b1f14;--card:#3b2b1c;--ink:#fff3e0;--mute:#cdb18a;--acc:#ffb347;--line:#5c462d}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,sans-serif;transition:background .8s,color .8s}
+main{max-width:480px;margin:0 auto;padding:16px 16px 48px}
+h1{font:700 30px Georgia,serif;text-align:center;margin:8px 0 18px;color:var(--acc)}
+h2{font:700 21px Georgia,serif;margin:0 0 8px;text-transform:capitalize}
+p{margin:0 0 8px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin-bottom:12px}
+.role{text-align:center;cursor:pointer}
+.big{font-size:46px;line-height:1.2}
+.mute{color:var(--mute)}
+.msg{border-color:var(--acc);font-size:17px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px}
+button,select,input{font:inherit;color:inherit}
+button{background:var(--acc);color:#1a1208;border:0;border-radius:12px;padding:12px;font-weight:700;cursor:pointer}
+button.alt{background:transparent;border:1px solid var(--line);color:var(--ink)}
+button.alt:active{border-color:var(--acc)}
+button:disabled{opacity:.4;cursor:default}
+.full{width:100%;margin-top:8px}
+input,select{width:100%;padding:12px;border-radius:12px;border:1px solid var(--line);background:var(--bg)}
+ul{list-style:none;margin:0;padding:0}
+li{display:flex;justify-content:space-between;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}
+li:last-child{border:0}
+hr{border:0;border-top:1px solid var(--line);margin:12px 0}
+.dead{opacity:.5;text-decoration:line-through}
+.err{color:var(--bad);min-height:1.4em;margin-top:8px}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+</style>
+</head>
+<body>
+<main><h1>🌙 Cidade Dorme</h1><div id="app"></div></main>
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const ICON={lobisomem:'🐺',médico:'⚕️',vidente:'🔮',morador:'🏠'};
+const DESC={
+  lobisomem:'Elimine os moradores sem ser descoberto. Escolha uma vítima por noite.',
+  médico:'Toda noite, proteja uma pessoa. Pode ser você mesmo.',
+  vidente:'Toda noite, descubra se alguém é lobisomem.',
+  morador:'Descubra os lobisomens e vote para eliminá-los.'
+};
+let T=null,S=null,show=false,W=0;
+try{T=localStorage.getItem('cd_t')}catch(e){}
+
+const post=(u,b)=>fetch(u,{method:'POST',body:JSON.stringify(b)}).then(r=>r.json());
+const act=(a,target,x)=>post('/act',{t:T,a,target,...x});
+
+function connect(){
+  const es=new EventSource('/events?t='+T);
+  es.onmessage=e=>{S=JSON.parse(e.data);render()};
+  es.onerror=()=>{if(es.readyState===2){try{localStorage.removeItem('cd_t')}catch(e){}T=S=null;render()}};
+}
+async function join(){
+  const r=await post('/join',{name:$('#n').value,t:T});
+  if(r.error){$('#err').textContent=r.error;return}
+  T=r.t;try{localStorage.setItem('cd_t',T)}catch(e){}
+  connect();
+}
+
+const JOIN=`<div class=card><p class=mute>Digite seu nome para entrar na sala.</p>
+<input id=n maxlength=16 placeholder="Seu nome" autocomplete=off onkeydown="event.key==='Enter'&&join()">
+<button class=full onclick="join()">Entrar na sala</button><div class=err id=err></div></div>`;
+
+function targets(list,fn){
+  const picks=id=>S.wolfPicks?Object.values(S.wolfPicks).filter(t=>t===id).length:0;
+  return `<div class=grid>${list.map(x=>`<button class=alt onclick="act('${fn}',${x.id})">${esc(x.name)}${' 🐺'.repeat(picks(x.id))}</button>`).join('')}</div>`;
+}
+
+function render(){
+  const A=$('#app');
+  document.body.dataset.p=S?S.phase:'lobby';
+  if(!T){A.innerHTML=JOIN;return}
+  if(!S){A.innerHTML='<p class=mute>Conectando…</p>';return}
+  const m=S.me,P=S.phase,ps=S.players,living=ps.filter(x=>x.alive);
+  let h='';
+
+  if(P!=='lobby'){
+    const mates=ps.filter(x=>x.role==='lobisomem'&&x.id!==m.id).map(x=>esc(x.name)).join(', ');
+    h+=`<div class="card role" onclick="show=!show;render()">`+
+      (show?`<div class=big>${ICON[m.role]}</div><h2>${m.role}</h2><p>${DESC[m.role]}</p>${m.role==='lobisomem'&&mates?`<p>Seus parceiros: <b>${mates}</b></p>`:''}`
+           :`<div class=big>🎴</div><p class=mute>Toque aqui para ver ou esconder seu papel</p>`)+
+      (m.alive?'':'<p>☠ Você foi eliminado. Acompanhe em silêncio.</p>')+`</div>`;
+  }
+
+  if(P==='lobby'){
+    const n=ps.length,max=Math.max(1,Math.floor((n-1)/2));
+    h+=`<div class=card><h2>Sala (${n} jogadores)</h2><p class=mute>São necessários pelo menos 4 jogadores.</p>`;
+    if(m.host)h+=`<p class=mute>Quantidade de lobisomens</p><select onchange="W=+this.value"><option value=0>Automático</option>${Array.from({length:max},(_,i)=>`<option value=${i+1} ${W===i+1?'selected':''}>${i+1}</option>`).join('')}</select>
+      <button class=full ${n<4?'disabled':''} onclick="act('start',0,{wolves:W})">Iniciar jogo</button>`;
+    else h+='<p>Aguardando o anfitrião iniciar a partida…</p>';
+    h+='</div>';
+  }
+  else if(P==='night'){
+    const r=m.role;let b;
+    if(!m.alive)b='<p>A cidade dorme. Você está fora do jogo.</p>';
+    else if(r==='morador')b='<h2>🌙 A cidade dorme…</h2><p>Feche os olhos e fique em silêncio até o amanhecer.</p>';
+    else if(S.done)b='<p>✅ Ação registrada. Aguardando os outros…</p>';
+    else{
+      const q={lobisomem:'Escolha a vítima da noite',médico:'Quem você vai proteger?',vidente:'Quem você quer investigar?'}[r];
+      const opts=living.filter(x=>r==='lobisomem'?x.role!=='lobisomem':r==='vidente'?x.id!==m.id:true);
+      b=`<h2>${q}</h2>`+targets(opts,'pick');
+    }
+    if(r==='vidente'&&S.seen.length)b+=`<hr><p class=mute>Suas visões:</p>`+S.seen.map(s=>`<div>${esc(s.name)}: ${s.wolf?'🐺 é lobisomem!':'não é lobisomem'}</div>`).join('');
+    h+=`<div class=card><p class=mute>Noite ${S.round}</p>${b}</div>`;
+  }
+  else if(P==='day'){
+    let b=m.alive?(S.voted?`<p>✅ Voto registrado (${S.nvoted}/${S.nalive}). Aguardando…</p>`
+      :`<h2>Em quem vocês votam?</h2><p class=mute>Discutam e escolha quem será eliminado.</p>`+targets(living.filter(x=>x.id!==m.id),'vote'))
+      :`<p>Votos registrados: ${S.nvoted}/${S.nalive}</p>`;
+    if(m.host)b+=`<button class="full alt" onclick="act('tally')">Encerrar votação agora</button>`;
+    h+=`<div class="card msg">${esc(S.msg)}</div><div class=card>${b}</div>`;
+  }
+  else if(P==='dayresult'){
+    h+=`<div class="card msg">${esc(S.msg)}</div>`+(m.host?`<button class=full onclick="act('next')">Começar a próxima noite 🌙</button>`:`<p class=mute>Aguardando o anfitrião…</p>`);
+  }
+  else{
+    h+=`<div class="card msg"><h2>${S.winner==='cidade'?'🏆 A cidade venceu!':'🐺 Os lobisomens venceram!'}</h2>${esc(S.msg)}</div>`+
+      (m.host?`<button class=full onclick="act('reset')">Jogar novamente</button>`:`<p class=mute>Aguardando o anfitrião…</p>`);
+  }
+
+  h+=`<div class=card><h2>Jogadores</h2><ul>${ps.map(x=>`<li><span class="${x.alive?'':'dead'}">${esc(x.name)}${x.id===m.id?' (você)':''}</span><span class=mute>${x.role?ICON[x.role]+' '+x.role:''}${x.alive?'':' ☠'}</span></li>`).join('')}</ul></div>`;
+  if(m.host&&P!=='lobby'&&P!=='over')h+=`<button class="full alt" onclick="confirm('Reiniciar a partida?')&&act('reset')">Reiniciar partida</button>`;
+  A.innerHTML=h;
+}
+
+if(T)connect();
+render();
+</script>
+</body>
+</html>
