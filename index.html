@@ -32,11 +32,22 @@ li:last-child{border:0}
 hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 .dead{opacity:.5;text-decoration:line-through}
 .err{color:var(--bad);min-height:1.4em;margin-top:8px}
+#chat-list{max-height:220px;overflow-y:auto;overflow-wrap:anywhere;margin-bottom:12px}
+#chat-list p{margin:0;padding:6px 0}
+#chat-list b{color:var(--acc)}
+#chat-form{display:flex;gap:8px}
+#chat-input{flex:1;min-width:0}
+#chat-input:disabled{opacity:.6}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 </style>
 </head>
 <body>
-<main><h1>🌙 Cidade Dorme</h1><div id="app"></div></main>
+<main><h1>🌙 Cidade Dorme</h1><div id="app"></div>
+<section id=chat class=card hidden><h2>💬 Chat</h2>
+<div id=chat-list role=log aria-live=polite></div>
+<form id=chat-form onsubmit="sendChat();return false">
+<input id=chat-input maxlength=200 placeholder="Digite uma mensagem…" aria-label="Mensagem do chat" autocomplete=off>
+<button type=submit>Enviar</button></form></section></main>
 <script>
 const $=s=>document.querySelector(s);
 const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
@@ -47,11 +58,31 @@ const DESC={
   vidente:'Toda noite, descubra se alguém é lobisomem.',
   morador:'Descubra os lobisomens e vote para eliminá-los.'
 };
-let T=null,S=null,show=false,W=0;
+let T=null,S=null,show=false,W=0,chatLast=null;
 try{T=localStorage.getItem('cd_t')}catch(e){}
 
 const post=(u,b)=>fetch(u,{method:'POST',body:JSON.stringify(b)}).then(r=>r.json());
 const act=(a,target,x)=>post('/act',{t:T,a,target,...x});
+
+function sendChat(){
+  const input=$('#chat-input');
+  if(!T||!S||!S.canChat||!input.value.trim())return;
+  act('say',0,{text:input.value});input.value='';input.focus();
+}
+
+function renderChat(){
+  const chat=$('#chat');chat.hidden=!T||!S;
+  if(chat.hidden)return;
+  const list=$('#chat-list'),messages=S.chat,last=messages.length?messages[messages.length-1].id:0;
+  if(last!==chatLast){
+    const nearEnd=list.scrollHeight-list.clientHeight-list.scrollTop<40;
+    list.innerHTML=messages.length?messages.map(x=>`<p><b>${esc(x.name)}${x.pid===S.me.id?' (você)':''}:</b> ${esc(x.text)}</p>`).join(''):'<p class=mute>Nenhuma mensagem ainda.</p>';
+    chatLast=last;if(nearEnd)list.scrollTop=list.scrollHeight;
+  }
+  const input=$('#chat-input');
+  input.disabled=$('#chat-form button').disabled=!S.canChat;
+  input.placeholder=S.canChat?'Digite uma mensagem…':S.phase==='night'?'🌙 A cidade dorme… o chat volta ao amanhecer.':'☠ Mortos não falam.';
+}
 
 function connect(){
   const es=new EventSource('/events?t='+T);
@@ -77,8 +108,8 @@ function targets(list,fn){
 function render(){
   const A=$('#app');
   document.body.dataset.p=S?S.phase:'lobby';
-  if(!T){A.innerHTML=JOIN;return}
-  if(!S){A.innerHTML='<p class=mute>Conectando…</p>';return}
+  if(!T){A.innerHTML=JOIN;renderChat();return}
+  if(!S){A.innerHTML='<p class=mute>Conectando…</p>';renderChat();return}
   const m=S.me,P=S.phase,ps=S.players,living=ps.filter(x=>x.alive);
   let h='';
 
@@ -129,6 +160,7 @@ function render(){
   h+=`<div class=card><h2>Jogadores</h2><ul>${ps.map(x=>`<li><span class="${x.alive?'':'dead'}">${esc(x.name)}${x.id===m.id?' (você)':''}</span><span class=mute>${x.role?ICON[x.role]+' '+x.role:''}${x.alive?'':' ☠'}</span></li>`).join('')}</ul></div>`;
   if(m.host&&P!=='lobby'&&P!=='over')h+=`<button class="full alt" onclick="confirm('Reiniciar a partida?')&&act('reset')">Reiniciar partida</button>`;
   A.innerHTML=h;
+  renderChat();
 }
 
 if(T)connect();
