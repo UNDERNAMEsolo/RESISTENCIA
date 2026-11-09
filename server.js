@@ -3,8 +3,8 @@ const http = require('http'), fs = require('fs'), path = require('path'), os = r
 const PORT = process.env.PORT || 3000;
 const WOLF = 'lobisomem', DOC = 'médico', SEER = 'vidente', VIL = 'morador';
 
-let players = [], nid = 0;
-let g = { phase: 'lobby', round: 0, msg: '', winner: null, wolf: {}, doc: null, seer: null, seen: [], votes: {} };
+let players = [], nid = 0, chatId = 0;
+let g = { phase: 'lobby', round: 0, msg: '', winner: null, wolf: {}, doc: null, seer: null, seen: [], votes: {}, chat: [] };
 
 const alive = () => players.filter(p => p.alive);
 const wolves = () => alive().filter(p => p.role === WOLF);
@@ -12,6 +12,7 @@ const byId = id => players.find(p => p.id === +id);
 const count = o => Object.keys(o).length;
 const needs = r => alive().some(p => p.role === r);
 const nightDone = () => wolves().every(w => w.id in g.wolf) && (!needs(DOC) || g.doc !== null) && (!needs(SEER) || g.seer !== null);
+const canChat = p => g.phase === 'lobby' || g.phase === 'over' || ((g.phase === 'day' || g.phase === 'dayresult') && p.alive);
 
 // Estado personalizado: cada jogador só recebe o que pode saber
 function view(p) {
@@ -23,7 +24,7 @@ function view(p) {
       id: x.id, name: x.name, alive: x.alive,
       role: (over || !x.alive || x === p || (isW && x.role === WOLF)) ? x.role : undefined
     })),
-    nvoted: count(g.votes), nalive: alive().length
+    nvoted: count(g.votes), nalive: alive().length, chat: g.chat, canChat: canChat(p)
   };
   if (g.phase === 'night') {
     v.done = !p.alive || (isW ? p.id in g.wolf : p.role === DOC ? g.doc !== null : p.role === SEER ? g.seer !== null : true);
@@ -75,6 +76,16 @@ function tally() {
 function act(p, b) {
   const host = players[0] === p, t = byId(b.target), n = players.length;
   switch (b.a) {
+    case 'say': {
+      const text = String(b.text || '').replace(/\s+/g, ' ').trim().slice(0, 200);
+      if (!text || !canChat(p)) return;
+      const now = Date.now();
+      if (now - (p.lastSay || 0) < 700) return;
+      p.lastSay = now;
+      g.chat.push({ id: ++chatId, pid: p.id, name: p.name, text });
+      if (g.chat.length > 60) g.chat.shift();
+      break;
+    }
     case 'start': {
       if (!host || g.phase !== 'lobby' || n < 4) return;
       const max = Math.max(1, Math.floor((n - 1) / 2));
@@ -82,7 +93,7 @@ function act(p, b) {
       const roles = [...Array(nw).fill(WOLF), DOC, SEER, ...Array(n - nw - 2).fill(VIL)];
       for (let i = roles.length; i > 1;) { const j = Math.floor(Math.random() * i--); [roles[i], roles[j]] = [roles[j], roles[i]]; }
       players.forEach((x, i) => { x.role = roles[i]; x.alive = true; });
-      Object.assign(g, { round: 0, winner: null, seen: [] });
+      Object.assign(g, { round: 0, winner: null, seen: [], chat: [] });
       startNight(); break;
     }
     case 'pick': {
@@ -105,7 +116,7 @@ function act(p, b) {
       if (!host) return;
       players = players.filter(x => x.res);
       players.forEach(x => { x.role = undefined; x.alive = true; });
-      Object.assign(g, { phase: 'lobby', round: 0, msg: '', winner: null });
+      Object.assign(g, { phase: 'lobby', round: 0, msg: '', winner: null, chat: [] });
       break;
     default: return;
   }
