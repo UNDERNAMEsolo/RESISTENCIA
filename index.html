@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Cidade Dorme</title>
+<title>RESISTENCIA</title>
 <style>
 :root{--bg:#0b1020;--card:#151c33;--ink:#e8ecff;--mute:#8b94b8;--acc:#f5c451;--bad:#ff5d6c;--line:#26304f}
 body[data-p=day],body[data-p=dayresult]{--bg:#2b1f14;--card:#3b2b1c;--ink:#fff3e0;--mute:#cdb18a;--acc:#ffb347;--line:#5c462d}
@@ -42,7 +42,7 @@ hr{border:0;border-top:1px solid var(--line);margin:12px 0}
 </style>
 </head>
 <body>
-<main><h1>🌙 Cidade Dorme</h1><div id="app"></div>
+<main><h1>🌙 RESISTENCIA</h1><div id="app"></div>
 <section id=chat class=card hidden><h2>💬 Chat</h2>
 <div id=chat-list role=log aria-live=polite></div>
 <form id=chat-form onsubmit="sendChat();return false">
@@ -81,7 +81,7 @@ function renderChat(){
   }
   const input=$('#chat-input');
   input.disabled=$('#chat-form button').disabled=!S.canChat;
-  input.placeholder=S.canChat?'Digite uma mensagem…':S.phase==='night'?'🌙 A cidade dorme… o chat volta ao amanhecer.':'☠ Mortos não falam.';
+  input.placeholder=S.canChat?'Digite uma mensagem…':S.phase==='night'?'🌙 A RESISTENCIA… o chat volta ao amanhecer.':'☠ Mortos não falam.';
 }
 
 function connect(){
@@ -131,8 +131,8 @@ function render(){
   }
   else if(P==='night'){
     const r=m.role;let b;
-    if(!m.alive)b='<p>A cidade dorme. Você está fora do jogo.</p>';
-    else if(r==='morador')b='<h2>🌙 A cidade dorme…</h2><p>Feche os olhos e fique em silêncio até o amanhecer.</p>';
+    if(!m.alive)b='<p>A RESISTENCIA. Você está fora do jogo.</p>';
+    else if(r==='morador')b='<h2>🌙 A RESISTENCIA…</h2><p>Feche os olhos e fique em silêncio até o amanhecer.</p>';
     else if(S.done)b='<p>✅ Ação registrada. Aguardando os outros…</p>';
     else{
       const q={lobisomem:'Escolha a vítima da noite',médico:'Quem você vai proteger?',vidente:'Quem você quer investigar?'}[r];
